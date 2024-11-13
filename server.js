@@ -11,7 +11,7 @@ const app = express();
 app.set('view engine', 'ejs');
 
 // Middleware
-app.use(cors({ origin: 'http://localhost:3000' }));
+app.use(cors({ origin: 'https://www.klippefort.online' }));
 app.use(bodyParser.json());
 
 // MongoDB Connection
