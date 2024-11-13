@@ -10,8 +10,10 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'https://klippefort.online' // replace with your frontend domain or IP
+  origin: 'https://klippefort.online',
+  credentials: true,
 }));
+
 app.use(bodyParser.json());
 
 // MongoDB Connection
