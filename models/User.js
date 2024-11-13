@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema({
     dateOfBirth: { type: Date, required: true },
     gender: { type: String, required: true },
     nationality: { type: String, required: true },
-    maritalStatus: { type: String, required: true },
+    maritalStatus: {type: String, required: true, default: "single"},      
     permanentAddress: { type: String, required: true },
     temporaryAddress: { type: String },
     contactNumber: { type: String, required: true },
