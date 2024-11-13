@@ -10,7 +10,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'http://klippefort.online' // replace with your frontend domain or IP
+  origin: 'https://klippefort.online' // replace with your frontend domain or IP
 }));
 app.use(bodyParser.json());
 
