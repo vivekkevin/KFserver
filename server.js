@@ -13,12 +13,16 @@ app.set('view engine', 'ejs');
 // Middleware
 app.use(cors({
   origin: [
-    'http://api.klippefort.online',  // Allow HTTP access for the subdomain
-    'https://api.klippefort.online' // Allow HTTPS access for the subdomain
+    'http://api.klippefort.online',   // Allow HTTP access for the API
+    'https://api.klippefort.online',  // Allow HTTPS access for the API
+    'http://klippefort.online',       // Allow HTTP frontend
+    'https://klippefort.online'       // Allow HTTPS frontend
   ],
-  methods: 'GET,POST,PUT,DELETE',
-  allowedHeaders: 'Content-Type,Authorization'
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Specify allowed HTTP methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Specify allowed headers
+  credentials: true // Enable credentials (if cookies or authentication tokens are used)
 }));
+
 
 
 app.use(bodyParser.json());
