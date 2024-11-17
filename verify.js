@@ -13,7 +13,7 @@ const verifyPassword = async (plaintextPassword, hashedPassword) => {
 };
 
 // Example usage
-const hashedPassword = '$2a$10$1OLQ33Ot3.61JGVpSaLYV.V61EwLITy6wI6DAJc9f/jupJLui5D2G'; // Replace with your bcrypt hash
+const hashedPassword = '$2a$10$bP6Bh4LdcB9nO2AsQZMvNuvYyoYv1ztFIQX/kO09xrZIg7MAHXwoG'; // Replace with your bcrypt hash
 const plaintextPassword = 'Suresh@1234'; // Replace with the password you want to verify
 
 verifyPassword(plaintextPassword, hashedPassword);

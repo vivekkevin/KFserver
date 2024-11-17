@@ -19,5 +19,5 @@ const hashPassword = async (password) => {
 };
 
 // Example usage
-const plainPassword = 'Suresh@1234'; // Replace with your actual password
+const plainPassword = 'Viveksam@1234'; // Replace with your actual password
 hashPassword(plainPassword);
