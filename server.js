@@ -11,7 +11,6 @@ const compression = require('compression');
 const morgan = require('morgan');
 require('dotenv').config();
 
-
 // Import routes
 const authRoutes = require('./routes/auth');
 // Add other route imports here
@@ -59,12 +58,12 @@ console.log('Frontend URL for CORS:', process.env.FRONTEND_URL);
 
 // CORS Configuration
 const corsOptions = {
-  origin: process.env.FRONTEND_URL.replace(/\/$/, '') || 'http://localhost:3000',
+  origin: process.env.FRONTEND_URL,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  maxAge: 86400 // 10 minutes
+  maxAge: 600 // 10 minutes
 };
 app.use(cors(corsOptions));
 
@@ -124,37 +123,37 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Error Handling Middleware for Not Found Routes
+// Error Handling Middleware
 app.use((req, res, next) => {
-  const error = new Error("Not Found");
+  const error = new Error('Not Found');
   error.status = 404;
   next(error);
 });
 
-// General Error Handling Middleware
 app.use((err, req, res, next) => {
-  console.error("Error status: ", err.status, "Message: ", err.message);
+  console.error(err.stack);
 
   if (err.name === 'ValidationError') {
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
       message: 'Validation Error',
       errors: Object.values(err.errors).map(error => error.message)
     });
-  } else if (err.name === 'CastError' && err.kind === 'ObjectId') {
-    res.status(400).json({
+  }
+
+  if (err.name === 'CastError' && err.kind === 'ObjectId') {
+    return res.status(400).json({
       success: false,
       message: 'Invalid ID format'
     });
-  } else {
-    res.status(err.status || 500).json({
-      success: false,
-      message: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error',
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-    });
   }
-});
 
+  res.status(err.status || 500).json({
+    success: false,
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error',
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
 
 // Server Configuration
 const PORT = process.env.PORT || 5000;
