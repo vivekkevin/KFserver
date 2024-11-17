@@ -2,8 +2,8 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
-const fs = require('fs');
-const path = require('path');
+const fs = require('fs'); 
+const path = require('path'); 
 const User = require('../models/User');
 
 const router = express.Router();
@@ -30,7 +30,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max file size
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const fileTypes = /jpeg|jpg|png/;
     const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
@@ -45,6 +45,7 @@ const upload = multer({
 });
 
 // Register Route
+// Register Route
 router.post('/register', upload.single('photo'), async (req, res) => {
   try {
     const {
@@ -57,7 +58,7 @@ router.post('/register', upload.single('photo'), async (req, res) => {
       temporaryAddress,
       contactNumber,
       email,
-      password,
+      password, 
       departmentLogo,
       degree,
       university,
@@ -92,10 +93,10 @@ router.post('/register', upload.single('photo'), async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Hash the password
     const salt = await bcrypt.genSalt(10); // Generate a salt
     const hashedPassword = await bcrypt.hash(password, salt); // Hash the password with the salt
-
+    console.log('Hashed Password:', hashedPassword); // Debug output for hashed password
+    
     // Create a new user object
     const user = new User({
       fullName,
@@ -107,7 +108,7 @@ router.post('/register', upload.single('photo'), async (req, res) => {
       temporaryAddress,
       contactNumber,
       email,
-      password: hashedPassword, // Save the hashed password
+      password: hashedPassword, 
       departmentLogo,
       photo: req.file ? `uploads/photos/${req.file.filename}` : '',
       degree,
@@ -151,18 +152,18 @@ router.post('/register', upload.single('photo'), async (req, res) => {
   }
 });
 
+
 // Login Route
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Check if the user exists
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Compare the entered password with the stored hashed password
+    // Compare the entered password with the stored hash
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(400).json({ message: 'Invalid credentials' });
@@ -170,13 +171,12 @@ router.post('/login', async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-    // Respond with the token and user details
     res.json({ token, user: { id: user._id, fullName: user.fullName, email: user.email } });
   } catch (error) {
-    console.error('Error during login:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+
 
 module.exports = router;
