@@ -23,8 +23,8 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions)); // Handle preflight requests for CORS
 
 // Middleware
-app.use(bodyParser.json()); // Parse incoming JSON requests
-app.use(bodyParser.urlencoded({ extended: true })); // Parse URL-encoded data
+app.use(bodyParser.json({ limit: '10mb' })); // Parse incoming JSON requests
+app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 app.use(cookieParser()); // Parse cookies in requests
 
 // MongoDB Connection

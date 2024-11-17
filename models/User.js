@@ -81,31 +81,5 @@ const userSchema = new mongoose.Schema({
     password: { type: String, required: true },
 });
 
-// Hash the password before saving the user model
-userSchema.pre('save', async function (next) {
-    if (!this.isModified('password')) return next(); // Skip if password is not modified
-
-    try {
-        const salt = await bcrypt.genSalt(10); // Generate salt
-        this.password = await bcrypt.hash(this.password, salt); // Hash password
-        next();
-    } catch (err) {
-        console.error('Error hashing password:', err);
-        next(err);
-    }
-});
-
-// Add method to compare passwords for login
-userSchema.methods.matchPassword = async function (enteredPassword) {
-    const isMatch = await bcrypt.compare(enteredPassword, this.password);
-    console.log('Password comparison:', {
-      enteredPassword,
-      storedHash: this.password,
-      isMatch,
-    });
-    return isMatch;
-  };
-  
-
 const User = mongoose.model('User', userSchema);
 module.exports = User;
