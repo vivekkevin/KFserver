@@ -86,20 +86,20 @@ router.post('/register', upload.single('photo'), async (req, res) => {
       emergencyContactAddress,
     } = req.body;
 
-    // Validate required fields
-    if (!email || !password || !fullName) {
-      return res.status(400).json({
-        success: false,
-        message: 'Full Name, Email, and Password are required'
-      });
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // Validate email format more robustly
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide a valid email address'
+        message: 'Invalid email format'
+      });
+    }
+
+    // Validate password strength
+    const passwordStrengthRegex = /(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}/; // Example regex
+    if (!passwordStrengthRegex.test(password)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 8 characters long and include at least one number, one uppercase and one lowercase letter.'
       });
     }
 
