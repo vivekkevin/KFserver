@@ -26,7 +26,7 @@ const test = async () => {
     await loginUser(password, hashedPassword);
 
     // Simulate login (comparison with an incorrect hash)
-    await loginUser(password, '$2a$10$pxoW/qSKbpcIuu5DI.Uqx.yvTlKZcNVs4eZTmia8NYTu7sKVKyRYu');
+    await loginUser(password, '$2a$10$kxji8gp3MueIUisNZ86nuusCUzAxm4vY1mL9mVrkSfCa5BnvQqVLq');
 };
 
 test();
