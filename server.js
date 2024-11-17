@@ -11,6 +11,7 @@ const compression = require('compression');
 const morgan = require('morgan');
 require('dotenv').config();
 
+
 // Import routes
 const authRoutes = require('./routes/auth');
 // Add other route imports here
@@ -123,37 +124,37 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Error Handling Middleware
+// Error Handling Middleware for Not Found Routes
 app.use((req, res, next) => {
-  const error = new Error('Not Found');
+  const error = new Error("Not Found");
   error.status = 404;
   next(error);
 });
 
+// General Error Handling Middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error("Error status: ", err.status, "Message: ", err.message);
 
   if (err.name === 'ValidationError') {
-    return res.status(400).json({
+    res.status(400).json({
       success: false,
       message: 'Validation Error',
       errors: Object.values(err.errors).map(error => error.message)
     });
-  }
-
-  if (err.name === 'CastError' && err.kind === 'ObjectId') {
-    return res.status(400).json({
+  } else if (err.name === 'CastError' && err.kind === 'ObjectId') {
+    res.status(400).json({
       success: false,
       message: 'Invalid ID format'
     });
+  } else {
+    res.status(err.status || 500).json({
+      success: false,
+      message: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error',
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
-
-  res.status(err.status || 500).json({
-    success: false,
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error',
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-  });
 });
+
 
 // Server Configuration
 const PORT = process.env.PORT || 5000;
