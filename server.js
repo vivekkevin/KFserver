@@ -8,67 +8,72 @@ require('dotenv').config(); // Load environment variables from .env file
 
 const app = express();
 
-// Middleware
+// Set EJS as the view engine
+app.set('view engine', 'ejs');
+
 // CORS Configuration
 const corsOptions = {
-  origin: 'https://klippefort.online', // Replace with your frontend URL
+  origin: 'https://klippefort.online', // Allow requests from your frontend
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow necessary HTTP methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Allow required headers
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allow these headers
   credentials: true, // Allow cookies and credentials
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Handle preflight requests
-app.use(bodyParser.json({ limit: '10mb' })); // Parse JSON requests
-app.use(bodyParser.urlencoded({ limit: '10mb', extended: true })); // Parse URL-encoded requests
-app.use(cookieParser()); // Parse cookies
+app.options('*', cors(corsOptions)); // Handle preflight requests for CORS
+
+// Middleware
+app.use(bodyParser.json({ limit: '10mb' })); // Parse incoming JSON requests
+app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
+app.use(cookieParser()); // Parse cookies in requests
 
 // MongoDB Connection
 const mongoURI = process.env.MONGODB_URI;
 if (!mongoURI) {
   console.error('Error: MONGODB_URI not defined in environment variables');
-  process.exit(1); // Exit if MongoDB URI is missing
+  process.exit(1); // Exit if no MongoDB URI is provided
 }
 
-mongoose
-  .connect(mongoURI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+mongoose.connect(mongoURI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
   .then(() => console.log('MongoDB connected'))
   .catch((err) => {
     console.error('Error connecting to MongoDB:', err);
     process.exit(1); // Exit if MongoDB connection fails
   });
 
+// Handle MongoDB errors
 mongoose.connection.on('error', (err) => {
   console.error('MongoDB connection error:', err);
 });
 
-// JWT Secret Validation
+// API Routes
+app.use('/api/auth', authRoutes); // All authentication-related routes
+
 if (!process.env.JWT_SECRET) {
   console.error('Error: JWT_SECRET not defined in environment variables');
   process.exit(1); // Exit if JWT_SECRET is missing
 }
 
-// Routes
-app.use('/api/auth', authRoutes); // Route for authentication
-
-// Health Check Route
-app.get('/status', (req, res) => {
-  const dbStatus = mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected';
-  res.status(200).json({ serverStatus: 'Running', dbStatus });
-});
-
-// Example Cookie Route
+// Example route for setting cookies (move this logic to a route that handles authentication)
 app.post('/set-cookie', (req, res) => {
-  const jwtToken = process.env.JWT_SECRET || 'example-token'; // Replace with JWT logic
+  const jwtToken = process.env.JWT_SECRET || 'example-token'; // Replace with your actual JWT logic
   res.cookie('token', jwtToken, {
     httpOnly: true,
-    secure: true, // Only sent over HTTPS
+    secure: true, // Ensures cookies are only sent over HTTPS
     sameSite: 'None', // Required for cross-site cookies
   });
   res.status(200).json({ message: 'Cookie set successfully' });
+});
+
+
+
+// Health Check Route for Monitoring
+app.get('/status', (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected';
+  res.render('status', { serverStatus: 'Running', dbStatus });
 });
 
 // Global Error Handler
