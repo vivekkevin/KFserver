@@ -93,7 +93,9 @@ router.post('/register', upload.single('photo'), async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
+    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
+    console.log('Hashed Password:', hashedPassword);
 
     // Create a new user object
     const user = new User({
