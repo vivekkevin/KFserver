@@ -5,9 +5,14 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const User = require('../models/User');
-const auth = require('../middleware/auth'); // JWT authentication middleware
+const auth = require('../middleware/auth');
 
 const router = express.Router();
+
+// Define regex patterns
+const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+const passwordStrengthRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/;
+const phoneRegex = /^\+?[\d\s-]{8,}$/;
 
 // Ensure uploads directory exists
 const ensureDirectoryExistence = (dir) => {
@@ -45,9 +50,43 @@ const upload = multer({
   },
 });
 
+// Validation middleware
+const validateRegistrationInput = (req, res, next) => {
+  const errors = [];
+  const { email, password, fullName, contactNumber } = req.body;
+
+  if (!email || !emailRegex.test(email)) {
+    errors.push('Invalid email format');
+  }
+
+  if (!password || !passwordStrengthRegex.test(password)) {
+    errors.push('Password must be at least 8 characters long and include at least one number, uppercase letter, lowercase letter, and special character');
+  }
+
+  if (!fullName || fullName.trim().length < 2) {
+    errors.push('Full name is required and must be at least 2 characters');
+  }
+
+  if (!contactNumber || !phoneRegex.test(contactNumber)) {
+    errors.push('Valid contact number is required');
+  }
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors
+    });
+  }
+
+  next();
+};
+
 // Register route
-router.post('/register', upload.single('photo'), async (req, res) => {
+router.post('/register', upload.single('photo'), validateRegistrationInput, async (req, res) => {
   try {
+    console.log('Registration attempt for email:', req.body.email);
+    
     const {
       fullName,
       dateOfBirth,
@@ -86,29 +125,12 @@ router.post('/register', upload.single('photo'), async (req, res) => {
       emergencyContactAddress,
     } = req.body;
 
-    // Validate email format more robustly
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid email format'
-      });
-    }
-
-    // Validate password strength
-    const passwordStrengthRegex = /(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}/; // Example regex
-    if (!passwordStrengthRegex.test(password)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password must be at least 8 characters long and include at least one number, one uppercase and one lowercase letter.'
-      });
-    }
-
     // Check if user exists
     const userExists = await User.findOne({ email: email.toLowerCase() });
     if (userExists) {
       return res.status(400).json({
         success: false,
-        message: 'User already exists'
+        message: 'User already exists with this email'
       });
     }
 
@@ -157,6 +179,7 @@ router.post('/register', upload.single('photo'), async (req, res) => {
     });
 
     await user.save();
+    console.log('User saved successfully:', user._id);
 
     // Generate JWT token
     const token = jwt.sign(
@@ -173,15 +196,33 @@ router.post('/register', upload.single('photo'), async (req, res) => {
 
   } catch (error) {
     console.error('Registration error:', error);
+    
     if (error instanceof multer.MulterError) {
       return res.status(400).json({
         success: false,
         message: `File upload error: ${error.message}`
       });
     }
+
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: Object.values(error.errors).map(err => err.message)
+      });
+    }
+
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'This email is already registered'
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: 'Server error during registration'
+      message: 'Server error during registration',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 });
