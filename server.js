@@ -11,18 +11,13 @@ const app = express();
 app.set('view engine', 'ejs');
 
 // CORS Configuration
-app.use(cors({
-  origin: [
-    'http://api.klippefort.online',   // Allow HTTP access for the API
-    'https://api.klippefort.online',  // Allow HTTPS access for the API
-    'http://klippefort.online',       // Allow HTTP frontend
-    'https://klippefort.online'       // Allow HTTPS frontend
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Specify allowed HTTP methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Specify allowed headers
-  credentials: true // Enable credentials if cookies or authentication tokens are used
-}));
+const corsOptions = {
+  origin: 'https://klippefort.online',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allow necessary methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allow necessary headers
+};
 
+app.use(cors(corsOptions));
 // Handle Preflight Requests
 app.options('*', cors());
 
