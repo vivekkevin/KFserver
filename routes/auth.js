@@ -2,8 +2,8 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
-const fs = require('fs'); 
-const path = require('path'); 
+const fs = require('fs');
+const path = require('path');
 const User = require('../models/User');
 
 const router = express.Router();
@@ -23,14 +23,15 @@ const storage = multer.diskStorage({
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
-    const fileName = Date.now() + '-' + file.originalname;
+    const fileName = Date.now() + '-' + file.originalname.replace(/\s+/g, '-');
     cb(null, fileName);
   },
 });
 
+// File upload configuration
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
   fileFilter: (req, file, cb) => {
     const fileTypes = /jpeg|jpg|png/;
     const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
@@ -38,14 +39,12 @@ const upload = multer({
 
     if (mimetype && extname) {
       return cb(null, true);
-    } else {
-      cb(new Error('Only images are allowed'));
     }
+    cb(new Error('Only image files (JPEG, JPG, PNG) are allowed'));
   },
 });
 
-// Register Route
-// Register Route
+// User registration route
 router.post('/register', upload.single('photo'), async (req, res) => {
   try {
     const {
@@ -58,8 +57,7 @@ router.post('/register', upload.single('photo'), async (req, res) => {
       temporaryAddress,
       contactNumber,
       email,
-      password, 
-      departmentLogo,
+      password,
       degree,
       university,
       yearOfGraduation,
@@ -87,16 +85,21 @@ router.post('/register', upload.single('photo'), async (req, res) => {
       emergencyContactAddress,
     } = req.body;
 
+    // Validate required fields
+    if (!email || !password || !fullName) {
+      return res.status(400).json({ message: 'Full Name, Email, and Password are required' });
+    }
+
     // Check if the user already exists by email
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    const salt = await bcrypt.genSalt(10); // Generate a salt
-    const hashedPassword = await bcrypt.hash(password, salt); // Hash the password with the salt
-    console.log('Hashed Password:', hashedPassword); // Debug output for hashed password
-    
+    // Hash the password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
     // Create a new user object
     const user = new User({
       fullName,
@@ -108,8 +111,7 @@ router.post('/register', upload.single('photo'), async (req, res) => {
       temporaryAddress,
       contactNumber,
       email,
-      password: hashedPassword, 
-      departmentLogo,
+      password: hashedPassword,
       photo: req.file ? `uploads/photos/${req.file.filename}` : '',
       degree,
       university,
@@ -141,7 +143,6 @@ router.post('/register', upload.single('photo'), async (req, res) => {
     // Save the user to the database
     await user.save();
 
-    // Respond with success message
     res.status(201).json({ message: 'User registered successfully' });
   } catch (error) {
     if (error instanceof multer.MulterError) {
@@ -152,11 +153,15 @@ router.post('/register', upload.single('photo'), async (req, res) => {
   }
 });
 
-
-// Login Route
+// User login route
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    // Validate required fields
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and Password are required' });
+    }
 
     const user = await User.findOne({ email });
     if (!user) {
@@ -171,12 +176,20 @@ router.post('/login', async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.json({ token, user: { id: user._id, fullName: user.fullName, email: user.email } });
+
+    res.status(200).json({
+      token,
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        photo: user.photo,
+      },
+    });
   } catch (error) {
+    console.error('Error during login:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
-
-
 
 module.exports = router;
