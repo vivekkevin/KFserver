@@ -61,7 +61,7 @@ app.post('/set-cookie', (req, res) => {
 });
 
 // Health Check Route for Monitoring
-app.get('/', (req, res) => {
+app.get('/status', (req, res) => {
   const dbStatus = mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected';
   res.render('status', { serverStatus: 'Running', dbStatus });
 });
