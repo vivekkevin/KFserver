@@ -61,9 +61,9 @@ const corsOptions = {
   origin: process.env.FRONTEND_URL.replace(/\/$/, '') || 'http://localhost:3000',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  maxAge: 600 // 10 minutes
+  maxAge: 86400 // 10 minutes
 };
 app.use(cors(corsOptions));
 
