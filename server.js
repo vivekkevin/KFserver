@@ -7,6 +7,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 const authRoutes = require('./routes/auth'); // Ensure this file exists and is properly configured
+const loginRoutes = require('./routes/login');
 require('dotenv').config(); // Load environment variables from .env file
 
 const app = express();
@@ -73,7 +74,7 @@ mongoose.connection.on('error', (err) => {
 
 // Routes
 app.use('/api/auth', authRoutes); // Authentication routes
-
+app.use('/api/auth', loginRoutes);
 // Example Route for Setting Cookies
 app.post('/set-cookie', (req, res) => {
   const jwtToken = process.env.JWT_SECRET || 'example-token';
