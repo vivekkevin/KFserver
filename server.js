@@ -15,6 +15,7 @@ require('dotenv').config();
 const authRoutes = require('./routes/auth');
 // Add other route imports here
 
+
 const app = express();
 
 // Basic Middleware
@@ -107,7 +108,7 @@ process.on('SIGINT', async () => {
 });
 
 // API Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', cors(corsOptions), authRoutes);
 // Add other route middlewares here
 
 // Health Check Route
