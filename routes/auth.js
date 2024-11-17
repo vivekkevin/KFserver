@@ -93,6 +93,8 @@ router.post('/register', upload.single('photo'), async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     // Create a new user object
     const user = new User({
       fullName,
@@ -104,7 +106,7 @@ router.post('/register', upload.single('photo'), async (req, res) => {
       temporaryAddress,
       contactNumber,
       email,
-      password, // Plain password; will be hashed by pre('save')
+      password: hashedPassword, 
       departmentLogo,
       photo: req.file ? `uploads/photos/${req.file.filename}` : '',
       degree,
