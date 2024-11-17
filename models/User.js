@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema({
     dateOfBirth: { type: Date, required: true },
     gender: { type: String, required: true },
     nationality: { type: String, required: true },
-    maritalStatus: {type: String, required: true, default: "single"},      
+    maritalStatus: { type: String, required: true, default: "single" },
     permanentAddress: { type: String, required: true },
     temporaryAddress: { type: String },
     contactNumber: { type: String, required: true },
@@ -47,24 +47,26 @@ const userSchema = new mongoose.Schema({
     degree: { type: String, required: true },
     university: { type: String, required: true },
     yearOfGraduation: { type: String, required: true },
-    departmentLogo: { type: String, required: true },  // Stores the selected logo
+    departmentLogo: { type: String, required: true },
     photo: { type: String },
     specializations: { type: String },
 
     // Previous Employment Details
-    previousEmployers: [{
-        employerName: { type: String },
-        designation: { type: String },
-        duration: { type: String },
-        reasonForLeaving: { type: String }
-    }],
+    previousEmployers: [
+        {
+            employerName: { type: String },
+            designation: { type: String },
+            duration: { type: String },
+            reasonForLeaving: { type: String },
+        },
+    ],
 
     // Health and Insurance Information
     medicalHistory: { type: String },
     healthInsurancePolicyNumber: { type: String },
     healthInsuranceProvider: { type: String },
     providentFundInfo: { type: String },
-    
+
     // Tax and Legal Information
     taxDeclarationForm: { type: String },
     taxExemptionDetails: { type: String },
@@ -76,26 +78,34 @@ const userSchema = new mongoose.Schema({
     professionalReferences: { type: String },
 
     // Password and Authentication
-    password: { type: String, required: true }
+    password: { type: String, required: true },
 });
 
 // Hash the password before saving the user model
 userSchema.pre('save', async function (next) {
-    if (!this.isModified('password')) return next();
-    
+    if (!this.isModified('password')) return next(); // Skip if password is not modified
+
     try {
-        const salt = await bcrypt.genSalt(10);
-        this.password = await bcrypt.hash(this.password, salt);
+        const salt = await bcrypt.genSalt(10); // Generate salt
+        this.password = await bcrypt.hash(this.password, salt); // Hash password
         next();
     } catch (err) {
+        console.error('Error hashing password:', err);
         next(err);
     }
 });
 
-// Add method to compare password for login
-userSchema.methods.matchPassword = function (enteredPassword) {
-    return bcrypt.compare(enteredPassword, this.password);
-};
+// Add method to compare passwords for login
+userSchema.methods.matchPassword = async function (enteredPassword) {
+    const isMatch = await bcrypt.compare(enteredPassword, this.password);
+    console.log('Password comparison:', {
+      enteredPassword,
+      storedHash: this.password,
+      isMatch,
+    });
+    return isMatch;
+  };
+  
 
 const User = mongoose.model('User', userSchema);
 module.exports = User;

@@ -45,6 +45,7 @@ const upload = multer({
 });
 
 // Register Route
+// Register Route
 router.post('/register', upload.single('photo'), async (req, res) => {
   try {
     const {
@@ -57,7 +58,7 @@ router.post('/register', upload.single('photo'), async (req, res) => {
       temporaryAddress,
       contactNumber,
       email,
-      password,
+      password, // Plain password
       departmentLogo,
       degree,
       university,
@@ -92,10 +93,7 @@ router.post('/register', upload.single('photo'), async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Hash the password before saving
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // Create a new user object with all the employee details
+    // Create a new user object
     const user = new User({
       fullName,
       dateOfBirth,
@@ -106,7 +104,7 @@ router.post('/register', upload.single('photo'), async (req, res) => {
       temporaryAddress,
       contactNumber,
       email,
-      password: hashedPassword,
+      password, // Plain password; will be hashed by pre('save')
       departmentLogo,
       photo: req.file ? `uploads/photos/${req.file.filename}` : '',
       degree,
@@ -149,6 +147,7 @@ router.post('/register', upload.single('photo'), async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
 
 // Login Route
 router.post('/login', async (req, res) => {

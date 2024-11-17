@@ -52,6 +52,11 @@ mongoose.connection.on('error', (err) => {
 // API Routes
 app.use('/api/auth', authRoutes); // All authentication-related routes
 
+if (!process.env.JWT_SECRET) {
+  console.error('Error: JWT_SECRET not defined in environment variables');
+  process.exit(1); // Exit if JWT_SECRET is missing
+}
+
 // Example route for setting cookies (move this logic to a route that handles authentication)
 app.post('/set-cookie', (req, res) => {
   const jwtToken = process.env.JWT_SECRET || 'example-token'; // Replace with your actual JWT logic
@@ -62,6 +67,8 @@ app.post('/set-cookie', (req, res) => {
   });
   res.status(200).json({ message: 'Cookie set successfully' });
 });
+
+
 
 // Health Check Route for Monitoring
 app.get('/status', (req, res) => {
