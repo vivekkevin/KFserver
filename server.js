@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser');
 const authRoutes = require('./routes/auth'); // Ensure this file exists and is properly configured
 require('dotenv').config(); // Load environment variables from .env file
 
@@ -19,10 +20,12 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Enable CORS with the specified options
+app.options('*', cors(corsOptions)); // Handle preflight requests for CORS
 
 // Middleware
 app.use(bodyParser.json()); // Parse incoming JSON requests
+app.use(bodyParser.urlencoded({ extended: true })); // Parse URL-encoded data
+app.use(cookieParser()); // Parse cookies in requests
 
 // MongoDB Connection
 const mongoURI = process.env.MONGODB_URI;
@@ -51,13 +54,13 @@ app.use('/api/auth', authRoutes); // All authentication-related routes
 
 // Example route for setting cookies (move this logic to a route that handles authentication)
 app.post('/set-cookie', (req, res) => {
-  const jwtToken = process.env.JWT_SECRET; // Replace with your actual JWT logic
+  const jwtToken = process.env.JWT_SECRET || 'example-token'; // Replace with your actual JWT logic
   res.cookie('token', jwtToken, {
     httpOnly: true,
-    secure: true,
-    sameSite: 'None',
+    secure: true, // Ensures cookies are only sent over HTTPS
+    sameSite: 'None', // Required for cross-site cookies
   });
-  res.status(200).json({ message: 'Cookie set' });
+  res.status(200).json({ message: 'Cookie set successfully' });
 });
 
 // Health Check Route for Monitoring
@@ -68,7 +71,7 @@ app.get('/status', (req, res) => {
 
 // Global Error Handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Unhandled Error:', err.stack);
   res.status(500).json({ message: 'An error occurred on the server' });
 });
 
