@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const authRoutes = require('./routes/auth'); // Ensure this file exists and is configured correctly
+const authRoutes = require('./routes/auth'); // Ensure this file exists and is properly configured
 require('dotenv').config(); // Load environment variables from .env file
 
 const app = express();
@@ -12,14 +12,14 @@ app.set('view engine', 'ejs');
 
 // CORS Configuration
 const corsOptions = {
-  origin: 'https://klippefort.online',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allow necessary methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Allow necessary headers
+  origin: 'https://klippefort.online', // Allow requests from your frontend
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow necessary HTTP methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allow these headers
+  credentials: true, // Allow cookies and credentials
 };
 
 app.use(cors(corsOptions));
-// Handle Preflight Requests
-app.options('*', cors());
+app.options('*', cors(corsOptions)); // Enable CORS with the specified options
 
 // Middleware
 app.use(bodyParser.json()); // Parse incoming JSON requests
@@ -49,10 +49,27 @@ mongoose.connection.on('error', (err) => {
 // API Routes
 app.use('/api/auth', authRoutes); // All authentication-related routes
 
+// Example route for setting cookies (move this logic to a route that handles authentication)
+app.post('/set-cookie', (req, res) => {
+  const jwtToken = process.env.JWT_SECRET; // Replace with your actual JWT logic
+  res.cookie('token', jwtToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'None',
+  });
+  res.status(200).json({ message: 'Cookie set' });
+});
+
 // Health Check Route for Monitoring
 app.get('/', (req, res) => {
   const dbStatus = mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected';
   res.render('status', { serverStatus: 'Running', dbStatus });
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: 'An error occurred on the server' });
 });
 
 // Start the Server
