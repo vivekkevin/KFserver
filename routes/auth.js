@@ -85,6 +85,7 @@ const validateRegistrationInput = (req, res, next) => {
 // Register route
 router.post('/register', upload.single('photo'), validateRegistrationInput, async (req, res) => {
   try {
+    console.log('Registration request body:', JSON.stringify(req.body, null, 2));
     console.log('Registration attempt for email:', req.body.email);
     
     const {
@@ -195,6 +196,11 @@ router.post('/register', upload.single('photo'), validateRegistrationInput, asyn
     });
 
   } catch (error) {
+      console.error('Detailed registration error:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
     console.error('Registration error:', error);
     
     if (error instanceof multer.MulterError) {
@@ -218,11 +224,15 @@ router.post('/register', upload.single('photo'), validateRegistrationInput, asyn
         message: 'This email is already registered'
       });
     }
-
+    
     res.status(500).json({
       success: false,
-      message: 'Server error during registration',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      message: 'Registration failed',
+      error: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        type: error.name,
+        details: error.stack
+      } : 'Internal server error'
     });
   }
 });

@@ -13,8 +13,6 @@ require('dotenv').config();
 
 // Import routes
 const authRoutes = require('./routes/auth');
-// Add other route imports here
-
 
 const app = express();
 
@@ -54,23 +52,40 @@ app.use(helmet({
   referrerPolicy: true,
   xssFilter: true
 }));
-console.log('Frontend URL for CORS:', process.env.FRONTEND_URL);
 
-// CORS Configuration
+// Consolidated CORS configuration
 const corsOptions = {
-  origin: process.env.FRONTEND_URL,
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      process.env.FRONTEND_URL,
+      'https://klippefort.online'
+    ].filter(Boolean); // Remove any undefined values
+    
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  maxAge: 600 // 10 minutes
+  maxAge: 600,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
+
+// Apply CORS configuration once
 app.use(cors(corsOptions));
+
+// Handle preflight requests
+app.options('*', cors(corsOptions));
 
 // Rate Limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false
@@ -94,7 +109,7 @@ mongoose.connect(process.env.MONGODB_URI, {
   process.exit(1);
 });
 
-// Handle MongoDB events
+// MongoDB event handlers
 mongoose.connection.on('error', (err) => {
   console.error('MongoDB error:', err);
 });
@@ -103,14 +118,8 @@ mongoose.connection.on('disconnected', () => {
   console.log('MongoDB disconnected');
 });
 
-process.on('SIGINT', async () => {
-  await mongoose.connection.close();
-  process.exit(0);
-});
-
 // API Routes
-app.use('/api/auth', cors(corsOptions), authRoutes);
-// Add other route middlewares here
+app.use('/api/auth', authRoutes);
 
 // Health Check Route
 app.get('/health', (req, res) => {
@@ -131,7 +140,18 @@ app.use((req, res, next) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Error details:', {
+    name: err.name,
+    message: err.message,
+    stack: err.stack
+  });
+
+  if (err.message.includes('CORS')) {
+    return res.status(403).json({
+      success: false,
+      message: 'CORS error: Origin not allowed'
+    });
+  }
 
   if (err.name === 'ValidationError') {
     return res.status(400).json({
