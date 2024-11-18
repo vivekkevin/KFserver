@@ -4,312 +4,224 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const { promisify } = require('util');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
+const mkdir = promisify(fs.mkdir);
 
-// Define regex patterns
-const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
-const passwordStrengthRegex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/;
-const phoneRegex = /^\+?[\d\s-]{8,}$/;
+// Constants
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_FILE_TYPES = /jpeg|jpg|png/;
+const TOKEN_EXPIRY = '1d';
+const UPLOAD_PATH = 'uploads/photos';
 
-// Ensure uploads directory exists
-const ensureDirectoryExistence = (dir) => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+// Helper Functions
+const createJwtToken = (userId) => {
+  return jwt.sign(
+    { userId },
+    process.env.JWT_SECRET,
+    { expiresIn: TOKEN_EXPIRY }
+  );
+};
+
+const validateFileType = (file) => {
+  const extname = ALLOWED_FILE_TYPES.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = ALLOWED_FILE_TYPES.test(file.mimetype);
+  return mimetype && extname;
+};
+
+// Ensure upload directory exists
+const ensureUploadDir = async () => {
+  try {
+    await mkdir(UPLOAD_PATH, { recursive: true });
+  } catch (error) {
+    console.error('Error creating upload directory:', error);
+    throw new Error('Failed to create upload directory');
   }
 };
 
-// Multer storage configuration
+// Multer Configuration
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = 'uploads/photos/';
-    ensureDirectoryExistence(uploadPath);
-    cb(null, uploadPath);
+  destination: async (req, file, cb) => {
+    await ensureUploadDir();
+    cb(null, UPLOAD_PATH);
   },
   filename: (req, file, cb) => {
-    const fileName = Date.now() + '-' + file.originalname.replace(/\s+/g, '-');
-    cb(null, fileName);
-  },
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+    const ext = path.extname(file.originalname);
+    cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
+  }
 });
 
-// File upload configuration
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter: (req, file, cb) => {
-    const fileTypes = /jpeg|jpg|png/;
-    const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = fileTypes.test(file.mimetype);
-
-    if (mimetype && extname) {
-      return cb(null, true);
-    }
-    cb(new Error('Only image files (JPEG, JPG, PNG) are allowed'));
+  limits: {
+    fileSize: MAX_FILE_SIZE,
+    files: 1
   },
+  fileFilter: (req, file, cb) => {
+    if (validateFileType(file)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, JPG, and PNG files are allowed.'));
+    }
+  }
 });
 
-// Validation middleware
-const validateRegistrationInput = (req, res, next) => {
-  const errors = [];
-  const { email, password, fullName, contactNumber } = req.body;
+// Validation Middleware
+const validateRegistration = async (req, res, next) => {
+  try {
+    const { email, password, fullName, contactNumber } = req.body;
+    const errors = [];
 
-  if (!email || !emailRegex.test(email)) {
-    errors.push('Invalid email format');
+    // Email validation
+    if (!email || !email.match(/^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/)) {
+      errors.push('Valid email address is required');
+    }
+
+    // Password validation
+    if (!password || !password.match(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/)) {
+      errors.push('Password must contain at least 8 characters, including uppercase, lowercase, number, and special character');
+    }
+
+    // Name validation
+    if (!fullName || fullName.trim().length < 2) {
+      errors.push('Full name must be at least 2 characters long');
+    }
+
+    // Phone validation
+    if (!contactNumber || !contactNumber.match(/^\+?[\d\s-]{8,}$/)) {
+      errors.push('Valid contact number is required');
+    }
+
+    // Check for existing user
+    if (email) {
+      const existingUser = await User.findOne({ email: email.toLowerCase() });
+      if (existingUser) {
+        errors.push('Email address is already registered');
+      }
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors
+      });
+    }
+
+    next();
+  } catch (error) {
+    next(error);
   }
-
-  if (!password || !passwordStrengthRegex.test(password)) {
-    errors.push('Password must be at least 8 characters long and include at least one number, uppercase letter, lowercase letter, and special character');
-  }
-
-  if (!fullName || fullName.trim().length < 2) {
-    errors.push('Full name is required and must be at least 2 characters');
-  }
-
-  if (!contactNumber || !phoneRegex.test(contactNumber)) {
-    errors.push('Valid contact number is required');
-  }
-
-  if (errors.length > 0) {
-    return res.status(400).json({
-      success: false,
-      message: 'Validation failed',
-      errors
-    });
-  }
-
-  next();
 };
 
-// Register route
-router.post('/register', upload.single('photo'), validateRegistrationInput, async (req, res) => {
+// Route Handlers
+const handleRegistration = async (req, res) => {
   try {
-    console.log('Registration request body:', JSON.stringify(req.body, null, 2));
-    console.log('Registration attempt for email:', req.body.email);
+    const userData = { ...req.body };
     
-    const {
-      fullName,
-      dateOfBirth,
-      gender,
-      nationality,
-      maritalStatus,
-      permanentAddress,
-      temporaryAddress,
-      contactNumber,
-      email,
-      password,
-      degree,
-      university,
-      yearOfGraduation,
-      employeeId,
-      designation,
-      department,
-      dateOfJoining,
-      employmentType,
-      reportingManager,
-      workLocation,
-      panNumber,
-      aadharNumber,
-      passportNumber,
-      socialSecurityNumber,
-      drivingLicenseNumber,
-      bankAccountNumber,
-      bankName,
-      bankBranch,
-      ifscCode,
-      payrollPreferences,
-      salaryStructure,
-      emergencyContactName,
-      emergencyContactRelationship,
-      emergencyContactPhone,
-      emergencyContactAddress,
-    } = req.body;
-
-    // Check if user exists
-    const userExists = await User.findOne({ email: email.toLowerCase() });
-    if (userExists) {
-      return res.status(400).json({
-        success: false,
-        message: 'User already exists with this email'
-      });
+    // Set photo path if file was uploaded
+    if (req.file) {
+      userData.photo = path.join(UPLOAD_PATH, req.file.filename);
     }
-
-    // Hash password
-    const salt = await bcrypt.genSalt(12);
-    const hashedPassword = await bcrypt.hash(password, salt);
 
     // Create new user
-    const user = new User({
-      fullName,
-      dateOfBirth,
-      gender,
-      nationality,
-      maritalStatus,
-      permanentAddress,
-      temporaryAddress,
-      contactNumber,
-      email: email.toLowerCase(),
-      password: hashedPassword,
-      photo: req.file ? `uploads/photos/${req.file.filename}` : '',
-      degree,
-      university,
-      yearOfGraduation,
-      employeeId,
-      designation,
-      department,
-      dateOfJoining,
-      employmentType,
-      reportingManager,
-      workLocation,
-      panNumber,
-      aadharNumber,
-      passportNumber,
-      socialSecurityNumber,
-      drivingLicenseNumber,
-      bankAccountNumber,
-      bankName,
-      bankBranch,
-      ifscCode,
-      payrollPreferences,
-      salaryStructure,
-      emergencyContactName,
-      emergencyContactRelationship,
-      emergencyContactPhone,
-      emergencyContactAddress,
-    });
-
+    const user = new User(userData);
     await user.save();
-    console.log('User saved successfully:', user._id);
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: '1d' }
-    );
+    // Generate token
+    const token = createJwtToken(user._id);
 
+    // Send response
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
-      token
-    });
-
-  } catch (error) {
-      console.error('Detailed registration error:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      });
-    console.error('Registration error:', error);
-    
-    if (error instanceof multer.MulterError) {
-      return res.status(400).json({
-        success: false,
-        message: `File upload error: ${error.message}`
-      });
-    }
-
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation error',
-        errors: Object.values(error.errors).map(err => err.message)
-      });
-    }
-
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: 'This email is already registered'
-      });
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: 'Registration failed',
-      error: process.env.NODE_ENV === 'development' ? {
-        message: error.message,
-        type: error.name,
-        details: error.stack
-      } : 'Internal server error'
-    });
-  }
-});
-
-// Login route
-router.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Validate input
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email and password are required'
-      });
-    }
-
-    // Find user
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
-
-    // Verify password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: '1d' }
-    );
-
-    // Set token in cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Strict',
-      maxAge: 24 * 60 * 60 * 1000 // 1 day
-    });
-
-    res.json({
-      success: true,
-      message: 'Login successful',
+      message: 'Registration successful',
       token,
       user: {
         id: user._id,
         fullName: user.fullName,
         email: user.email,
-        employeeId: user.employeeId,
-        designation: user.designation,
-        department: user.department
+        employeeId: user.employeeId
       }
     });
-
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
+    throw error;
+  }
+};
+
+const handleLogin = async (req, res) => {
+  const { email, password } = req.body;
+
+  // Find user
+  const user = await User.findOne({ email: email.toLowerCase() })
+    .select('+password')
+    .lean();
+
+  if (!user) {
+    return res.status(401).json({
       success: false,
-      message: 'Server error during login'
+      message: 'Invalid credentials'
     });
+  }
+
+  // Verify password
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid credentials'
+    });
+  }
+
+  // Generate token
+  const token = createJwtToken(user._id);
+
+  // Update last login
+  await User.findByIdAndUpdate(user._id, {
+    lastLogin: new Date()
+  });
+
+  // Send response
+  delete user.password;
+  res.json({
+    success: true,
+    message: 'Login successful',
+    token,
+    user
+  });
+};
+
+// Routes
+router.post(
+  '/register',
+  upload.single('photo'),
+  validateRegistration,
+  async (req, res, next) => {
+    try {
+      await handleRegistration(req, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.post('/login', async (req, res, next) => {
+  try {
+    await handleLogin(req, res);
+  } catch (error) {
+    next(error);
   }
 });
 
-// Get current user profile
-router.get('/profile', auth, async (req, res) => {
+router.get('/profile', auth, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.userId).select('-password');
+    const user = await User.findById(req.user.userId)
+      .select('-password')
+      .lean();
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -321,69 +233,53 @@ router.get('/profile', auth, async (req, res) => {
       success: true,
       user
     });
-
   } catch (error) {
-    console.error('Profile fetch error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching profile'
-    });
+    next(error);
   }
 });
 
-// Update user profile
-router.put('/profile', auth, upload.single('photo'), async (req, res) => {
-  try {
-    const updates = req.body;
-    delete updates.password; // Prevent password update through this route
+router.put(
+  '/profile',
+  auth,
+  upload.single('photo'),
+  async (req, res, next) => {
+    try {
+      const updates = { ...req.body };
+      delete updates.password;
 
-    if (req.file) {
-      updates.photo = `uploads/photos/${req.file.filename}`;
-    }
+      if (req.file) {
+        updates.photo = path.join(UPLOAD_PATH, req.file.filename);
+      }
 
-    const user = await User.findByIdAndUpdate(
-      req.user.userId,
-      { $set: updates },
-      { new: true, runValidators: true }
-    ).select('-password');
+      const user = await User.findByIdAndUpdate(
+        req.user.userId,
+        { $set: updates },
+        { new: true, runValidators: true }
+      ).select('-password');
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Profile updated successfully',
+        user
       });
+    } catch (error) {
+      next(error);
     }
-
-    res.json({
-      success: true,
-      message: 'Profile updated successfully',
-      user
-    });
-
-  } catch (error) {
-    console.error('Profile update error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while updating profile'
-    });
   }
-});
+);
 
-// Change password
-router.post('/change-password', auth, async (req, res) => {
+router.post('/change-password', auth, async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
-    // Validate input
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Current password and new password are required'
-      });
-    }
-
-    // Get user
-    const user = await User.findById(req.user.userId);
+    const user = await User.findById(req.user.userId).select('+password');
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -391,8 +287,7 @@ router.post('/change-password', auth, async (req, res) => {
       });
     }
 
-    // Verify current password
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    const isMatch = await user.comparePassword(currentPassword);
     if (!isMatch) {
       return res.status(401).json({
         success: false,
@@ -400,35 +295,25 @@ router.post('/change-password', auth, async (req, res) => {
       });
     }
 
-    // Hash new password
-    const salt = await bcrypt.genSalt(12);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-    // Update password
-    user.password = hashedPassword;
+    user.password = newPassword;
     await user.save();
 
     res.json({
       success: true,
       message: 'Password changed successfully'
     });
-
   } catch (error) {
-    console.error('Password change error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while changing password'
-    });
+    next(error);
   }
 });
 
-// Logout route
-router.post('/logout', (req, res) => {
+router.post('/logout', auth, (req, res) => {
   res.cookie('token', '', {
     httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
     expires: new Date(0)
   });
-  
+
   res.json({
     success: true,
     message: 'Logged out successfully'

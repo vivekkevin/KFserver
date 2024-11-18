@@ -2,7 +2,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -53,13 +52,13 @@ app.use(helmet({
   xssFilter: true
 }));
 
-// Consolidated CORS configuration
+// CORS Configuration
 const corsOptions = {
   origin: (origin, callback) => {
     const allowedOrigins = [
       process.env.FRONTEND_URL,
-      'https://klippefort.online'
-    ].filter(Boolean); // Remove any undefined values
+      'http://localhost:3000'  // Development frontend
+    ].filter(Boolean);
     
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
@@ -69,33 +68,28 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  maxAge: 600,
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+  maxAge: 600
 };
 
-// Apply CORS configuration once
 app.use(cors(corsOptions));
-
-// Handle preflight requests
-app.options('*', cors(corsOptions));
 
 // Rate Limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false
 });
+
 app.use('/api/', limiter);
 
 // MongoDB Sanitization
 app.use(mongoSanitize());
 
-// Serve static files
+// Static Files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // MongoDB Connection
@@ -107,15 +101,6 @@ mongoose.connect(process.env.MONGODB_URI, {
 .catch((err) => {
   console.error('MongoDB connection error:', err);
   process.exit(1);
-});
-
-// MongoDB event handlers
-mongoose.connection.on('error', (err) => {
-  console.error('MongoDB error:', err);
-});
-
-mongoose.connection.on('disconnected', () => {
-  console.log('MongoDB disconnected');
 });
 
 // API Routes
@@ -140,11 +125,7 @@ app.use((req, res, next) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error('Error details:', {
-    name: err.name,
-    message: err.message,
-    stack: err.stack
-  });
+  console.error('Error:', err);
 
   if (err.message.includes('CORS')) {
     return res.status(403).json({
